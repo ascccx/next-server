@@ -1,146 +1,142 @@
 #!/bin/bash
 
-red='\033[0;31m'
-green='\033[0;32m'
-plain='\033[0m'
+# 设置 NeXT-Server 的版本和下载链接
+VERSION="0.3.8"
+DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/download/v0.3.8/next-server-linux-amd64.zip"
+INSTALL_DIR="/opt/NeXT-Server"
+SERVICE_FILE="/etc/systemd/system/next-server.service"
 
-SERVICE_NAME="next-server"
-SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
-START_SCRIPT="/opt/next-server/start-script.sh"
-WORKING_DIR="/opt/NeXT-Server"
-USER="root"
-GROUP="root"
-REPO_URL="https://github.com/The-NeXT-Project/NeXT-Server"
-BACKUP_DIR="/opt/next-server-backup"
+# 颜色设置
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
 
-# 显示帮助信息
-function show_help() {
-    echo -e "${green}Usage: next {install|uninstall|start|stop|restart|status|logs|update}${plain}"
-    exit 1
+function show_menu() {
+    echo -e "${GREEN}请选择要执行的操作：${NC}"
+    echo -e "${GREEN}1. 安装 NeXT-Server${NC}"
+    echo -e "${GREEN}2. 启动 NeXT-Server${NC}"
+    echo -e "${GREEN}3. 停止 NeXT-Server${NC}"
+    echo -e "${GREEN}4. 重启 NeXT-Server${NC}"
+    echo -e "${GREEN}5. 查看 NeXT-Server 日志${NC}"
+    echo -e "${GREEN}6. 查看 NeXT-Server 状态${NC}"
+    echo -e "${GREEN}7. 卸载 NeXT-Server${NC}"
+    echo -e "${GREEN}0. 退出${NC}"
 }
 
-# 创建 systemd 服务文件
-function install_service() {
-    echo "Installing $SERVICE_NAME service..."
-    sudo tee $SERVICE_FILE > /dev/null <<EOF
+function download_and_install() {
+    echo "Downloading NeXT-Server..."
+    wget -O /tmp/next-server.zip "$DOWNLOAD_URL"
+
+    echo "Creating installation directory..."
+    mkdir -p "$INSTALL_DIR"
+
+    echo "Extracting NeXT-Server..."
+    unzip /tmp/next-server.zip -d "$INSTALL_DIR"
+
+    echo "Creating systemd service file..."
+    cat <<EOF > "$SERVICE_FILE"
 [Unit]
-Description=Next Server
+Description=NeXT Server
 After=network.target
 
 [Service]
-ExecStart=$START_SCRIPT
-WorkingDirectory=$WORKING_DIR
-Restart=always
-User=$USER
-Group=$GROUP
+Type=simple
+ExecStart=/opt/NeXT-Server/next-server
+Restart=on-failure
+User=root
+Group=root
+WorkingDirectory=/opt/NeXT-Server
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+    echo "Reloading systemd daemon..."
     sudo systemctl daemon-reload
-    sudo systemctl enable $SERVICE_NAME
-    echo "$SERVICE_NAME service installed and enabled."
+
+    echo "NeXT-Server installation and configuration complete."
 }
 
-# 删除 systemd 服务文件
-function uninstall_service() {
-    echo "Uninstalling $SERVICE_NAME service..."
-    sudo systemctl stop $SERVICE_NAME
-    sudo systemctl disable $SERVICE_NAME
-    sudo rm $SERVICE_FILE
-    sudo systemctl daemon-reload
-    echo "$SERVICE_NAME service uninstalled."
-}
-
-# 启动服务
 function start_service() {
-    echo "Starting $SERVICE_NAME..."
-    sudo systemctl start $SERVICE_NAME
-    echo "$SERVICE_NAME started."
+    echo "Starting NeXT-Server..."
+    sudo systemctl start next-server
+    echo "NeXT-Server has been started."
 }
 
-# 停止服务
 function stop_service() {
-    echo "Stopping $SERVICE_NAME..."
-    sudo systemctl stop $SERVICE_NAME
-    echo "$SERVICE_NAME stopped."
+    echo "Stopping NeXT-Server..."
+    sudo systemctl stop next-server
+    echo "NeXT-Server has been stopped."
 }
 
-# 重启服务
 function restart_service() {
-    echo "Restarting $SERVICE_NAME..."
-    sudo systemctl restart $SERVICE_NAME
-    echo "$SERVICE_NAME restarted."
+    echo "Restarting NeXT-Server..."
+    sudo systemctl restart next-server
+    echo "NeXT-Server has been restarted."
 }
 
-# 查看服务状态
-function status_service() {
-    echo "Checking status of $SERVICE_NAME..."
-    sudo systemctl status $SERVICE_NAME
+function view_logs() {
+    echo "Viewing NeXT-Server logs..."
+    sudo journalctl -u next-server -f
 }
 
-# 查看服务日志
-function logs_service() {
-    echo "Viewing logs for $SERVICE_NAME..."
-    sudo journalctl -u $SERVICE_NAME
-    echo -e "${green}返回菜单...${plain}"
+function check_status() {
+    echo "Checking NeXT-Server status..."
+    sudo systemctl status next-server
 }
 
-# 克隆或更新仓库
-function update_repository() {
-    if [ -d "$WORKING_DIR" ]; then
-        echo "Updating existing repository in $WORKING_DIR..."
-        cd $WORKING_DIR
-        sudo git pull origin main
+function uninstall() {
+    read -p "确定要卸载 NeXT-Server 吗？[y/N]: " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Stopping and disabling NeXT-Server..."
+        sudo systemctl stop next-server
+        sudo systemctl disable next-server
+
+        echo "Removing systemd service file..."
+        sudo rm -f "$SERVICE_FILE"
+
+        echo "Removing installation directory..."
+        sudo rm -rf "$INSTALL_DIR"
+
+        echo "Reloading systemd daemon..."
+        sudo systemctl daemon-reload
+
+        echo "NeXT-Server has been uninstalled."
     else
-        echo "Cloning repository from $REPO_URL to $WORKING_DIR..."
-        sudo git clone $REPO_URL $WORKING_DIR
+        echo "Uninstallation aborted."
     fi
 }
 
-# 备份当前版本
-function backup_current_version() {
-    if [ -d "$WORKING_DIR" ]; then
-        echo "Backing up current version to $BACKUP_DIR..."
-        sudo rsync -av --delete $WORKING_DIR/ $BACKUP_DIR/
-    fi
-}
-
-# 执行更新
-function update_next_server() {
-    backup_current_version
-    update_repository
-}
-
-# 显示菜单
-function show_menu() {
-    while true; do
-        echo -e "${green}请选择操作：${plain}"
-        echo "1. 安装服务"
-        echo "2. 卸载服务"
-        echo "3. 启动服务"
-        echo "4. 停止服务"
-        echo "5. 重启服务"
-        echo "6. 查看服务状态"
-        echo "7. 查看服务日志"
-        echo "8. 更新服务"
-        echo "0. 退出"
-        read -p "请输入选项 (0-8): " option
-        case "$option" in
-            1) install_service; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            2) uninstall_service; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            3) start_service; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            4) stop_service; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            5) restart_service; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            6) status_service; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            7) logs_service ;;
-            8) update_next_server; echo -e "${green}操作完成，返回菜单...${plain}" ;;
-            0) exit 0 ;;
-            *) echo -e "${red}无效的选项，请重新输入。${plain}" ;;
-        esac
-    done
-}
-
-# 主程序
-show_menu
+while true; do
+    show_menu
+    read -p "请输入你的选择 [0-7]: " choice
+    case $choice in
+        1)
+            download_and_install
+            ;;
+        2)
+            start_service
+            ;;
+        3)
+            stop_service
+            ;;
+        4)
+            restart_service
+            ;;
+        5)
+            view_logs
+            ;;
+        6)
+            check_status
+            ;;
+        7)
+            uninstall
+            ;;
+        0)
+            echo "Exiting..."
+            exit 0
+            ;;
+        *)
+            echo "无效的选择，请输入 0 到 7 之间的数字。"
+            ;;
+    esac
+done
