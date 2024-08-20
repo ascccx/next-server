@@ -1,20 +1,24 @@
 #!/bin/bash
 
-# 设置 NeXT-Server 的版本和下载链接
-VERSION="0.3.8"
-DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/download/v0.3.8/next-server-linux-amd64.zip"
+# 当前 NeXT-Server 版本
+VERSION="0.3.9"
+
+# 获取 NeXT-Server 的最新版本
+LATEST_VERSION=$(wget -qO- "https://api.github.com/repos/The-NeXT-Project/NeXT-Server/releases/latest" | grep "tag_name" | cut -d '"' -f 4)
+DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/download/${LATEST_VERSION}/next-server-linux-amd64.zip"
 INSTALL_DIR="/opt/NeXT-Server"
 SERVICE_FILE="/etc/systemd/system/next-server.service"
 
 # 颜色设置
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 function show_menu() {
     echo -e "${GREEN}NeXT-Server 一键脚本 [${VERSION}]${NC}"
     echo "一个基于Xray开发，支持多协议的专属后端框架"
     echo "支持协议:"
-    echo "(1) Shadowsocks 2022, (2) Trojan, (3) Vmess, (4) TUIC"
+    echo "(1) Shadowsocks2022, (2) Trojan, (3) Vmess, (4) TUIC"
     echo "项目地址：https://github.com/The-NeXT-Project/NeXT-Server"
     echo ""
     echo "请选择要执行的操作："
@@ -29,17 +33,22 @@ function show_menu() {
 }
 
 function download_and_install() {
-    echo -e "${GREEN}正在下载 NeXT-Server...${NC}"
+    echo -e "${YELLOW}正在下载 NeXT-Server...${NC}"
     wget -O /tmp/next-server.zip "$DOWNLOAD_URL"
 
-    echo -e "${GREEN}正在创建安装目录...${NC}"
+    echo -e "${YELLOW}正在创建安装目录...${NC}"
     mkdir -p "$INSTALL_DIR"
 
-    echo -e "${GREEN}正在解压 NeXT-Server...${NC}"
-    unzip /tmp/next-server.zip -d "$INSTALL_DIR"
+    echo -e "${YELLOW}正在解压 NeXT-Server，仅替换 next-server 文件...${NC}"
+    unzip -o /tmp/next-server.zip next-server -d "$INSTALL_DIR"
 
-    echo -e "${GREEN}正在创建 systemd 服务文件...${NC}"
-    cat <<EOF > "$SERVICE_FILE"
+    # 如果服务文件存在，则只重启服务
+    if [ -f "$SERVICE_FILE" ]; then
+        echo -e "${YELLOW}系统服务文件已存在，仅重启 NeXT-Server。${NC}"
+        sudo systemctl restart next-server
+    else
+        echo -e "${YELLOW}正在创建 systemd 服务文件...${NC}"
+        cat <<EOF | sudo tee "$SERVICE_FILE" > /dev/null
 [Unit]
 Description=NeXT Server
 After=network.target
@@ -56,59 +65,61 @@ WorkingDirectory=/opt/NeXT-Server
 WantedBy=multi-user.target
 EOF
 
-    echo -e "${GREEN}正在重新加载 systemd 守护进程...${NC}"
-    sudo systemctl daemon-reload
+        echo -e "${YELLOW}正在重新加载 systemd 守护进程...${NC}"
+        sudo systemctl daemon-reload
+        echo -e "${YELLOW}NeXT-Server 服务文件已创建并加载。${NC}"
+    fi
 
-    echo -e "${GREEN}NeXT-Server 安装与配置完成。${NC}"
+    echo -e "${YELLOW}NeXT-Server 安装与配置完成。${NC}"
 }
 
 function start_service() {
-    echo -e "${GREEN}正在启动 NeXT-Server...${NC}"
+    echo -e "${YELLOW}正在启动 NeXT-Server...${NC}"
     sudo systemctl start next-server
-    echo -e "${GREEN}NeXT-Server 已启动。${NC}"
+    echo -e "${YELLOW}NeXT-Server 已启动。${NC}"
 }
 
 function stop_service() {
-    echo -e "${GREEN}正在停止 NeXT-Server...${NC}"
+    echo -e "${YELLOW}正在停止 NeXT-Server...${NC}"
     sudo systemctl stop next-server
-    echo -e "${GREEN}NeXT-Server 已停止。${NC}"
+    echo -e "${YELLOW}NeXT-Server 已停止。${NC}"
 }
 
 function restart_service() {
-    echo -e "${GREEN}正在重启 NeXT-Server...${NC}"
+    echo -e "${YELLOW}正在重启 NeXT-Server...${NC}"
     sudo systemctl restart next-server
-    echo -e "${GREEN}NeXT-Server 已重启。${NC}"
+    echo -e "${YELLOW}NeXT-Server 已重启。${NC}"
 }
 
 function view_logs() {
-    echo -e "${GREEN}正在查看 NeXT-Server 日志...${NC}"
+    echo -e "${YELLOW}正在查看 NeXT-Server 日志...${NC}"
     sudo journalctl -u next-server -f
 }
 
 function check_status() {
-    echo -e "${GREEN}正在检查 NeXT-Server 状态...${NC}"
+    echo -e "${YELLOW}正在检查 NeXT-Server 状态...${NC}"
     sudo systemctl status next-server
 }
 
 function uninstall() {
     read -p "确定要卸载 NeXT-Server 吗？[y/N]: " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}正在停止并禁用 NeXT-Server...${NC}"
+        echo -e "${YELLOW}正在停止并禁用 NeXT-Server...${NC}"
         sudo systemctl stop next-server
         sudo systemctl disable next-server
 
-        echo -e "${GREEN}正在删除 systemd 服务文件...${NC}"
+        echo -e "${YELLOW}正在删除 systemd 服务文件...${NC}"
         sudo rm -f "$SERVICE_FILE"
 
-        echo -e "${GREEN}正在删除安装目录...${NC}"
+        echo -e "${YELLOW}正在删除安装目录...${NC}"
         sudo rm -rf "$INSTALL_DIR"
 
-        echo -e "${GREEN}正在重新加载 systemd 守护进程...${NC}"
+        echo -e "${YELLOW}正在重新加载 systemd 守护进程...${NC}"
         sudo systemctl daemon-reload
 
-        echo -e "${GREEN}NeXT-Server 已卸载。${NC}"
+        echo -e "${YELLOW}NeXT-Server 已卸载。${NC}"
     else
-        echo -e "${GREEN}卸载已取消。${NC}"
+        echo -e "${YELLOW}卸载已取消。${NC}"
     fi
 }
 
@@ -138,11 +149,11 @@ while true; do
             uninstall
             ;;
         0)
-            echo -e "${GREEN}正在退出...${NC}"
+            echo -e "${YELLOW}操作结束，已退出...${NC}"
             exit 0
             ;;
         *)
-            echo -e "${GREEN}无效的选择，请输入 0 到 7 之间的数字。${NC}"
+            echo -e "${YELLOW}无效的选择，请输入 0 到 7 之间的数字。${NC}"
             ;;
     esac
 done
