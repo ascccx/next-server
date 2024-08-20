@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 function show_menu() {
     echo -e "${GREEN}NeXT-Server 一键脚本${NC}"
     echo "一个基于Xray开发，支持多协议的专属后端框架"
-    echo "支持协议: (1) Shadowsocks2022, (2) Trojan, (3) Vmess, (4) TUIC"
+    echo "支持协议: (1) Shadowsocks2022 (2) Trojan (3) Vmess (4) TUIC"
     echo "项目地址：https://github.com/The-NeXT-Project/NeXT-Server"
     echo ""
     echo "请选择要执行的操作："
