@@ -3,7 +3,7 @@
 # 获取 NeXT-Server 的最新版本
 LATEST_VERSION=$(wget -qO- "https://api.github.com/repos/The-NeXT-Project/NeXT-Server/releases/latest" | grep "tag_name" | cut -d '"' -f 4)
 DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/download/${LATEST_VERSION}/next-server-linux-amd64.zip"
-INSTALL_DIR="/opt/NeXT-Server"
+INSTALL_DIR="/etc/next-server"
 SERVICE_FILE="/etc/systemd/system/next-server.service"
 
 # 颜色设置
@@ -35,8 +35,25 @@ function download_and_install() {
     echo -e "${YELLOW}正在创建安装目录...${NC}"
     mkdir -p "$INSTALL_DIR"
 
-    echo -e "${YELLOW}正在解压 NeXT-Server，仅替换 next-server 文件...${NC}"
-    unzip -o /tmp/next-server.zip next-server -d "$INSTALL_DIR"
+    # 需要检查的文件列表
+    FILES=("config.yml" "custom_inbound.json" "custom_outbound.json" "dns.json" "geoip.dat" "geosite.dat" "LICENSE" "next-server" "README.md" "route.json" "rulelist")
+
+    # 检查所有文件是否存在
+    ALL_EXIST=true
+    for file in "${FILES[@]}"; do
+        if [ ! -f "$INSTALL_DIR/$file" ]; then
+            ALL_EXIST=false
+            break
+        fi
+    done
+
+    if [ "$ALL_EXIST" = true ]; then
+        echo -e "${YELLOW}所有文件已存在，仅替换 next-server 文件...${NC}"
+        unzip -o /tmp/next-server.zip next-server -d "$INSTALL_DIR"
+    else
+        echo -e "${YELLOW}部分文件不存在，解压所有文件...${NC}"
+        unzip -o /tmp/next-server.zip -d "$INSTALL_DIR"
+    fi
 
     # 如果服务文件存在，则只重启服务
     if [ -f "$SERVICE_FILE" ]; then
@@ -51,11 +68,11 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/NeXT-Server/next-server
+ExecStart=/etc/next-server/next-server
 Restart=on-failure
 User=root
 Group=root
-WorkingDirectory=/opt/NeXT-Server
+WorkingDirectory=/etc/next-server
 
 [Install]
 WantedBy=multi-user.target
@@ -64,6 +81,8 @@ EOF
         echo -e "${YELLOW}正在重新加载 systemd 守护进程...${NC}"
         sudo systemctl daemon-reload
         echo -e "${YELLOW}NeXT-Server 服务文件已创建并加载。${NC}"
+        sudo systemctl enable next-server
+        sudo systemctl start next-server
     fi
 
     echo -e "${YELLOW}NeXT-Server 安装与配置完成。${NC}"
