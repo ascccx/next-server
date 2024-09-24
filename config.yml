@@ -1,11 +1,11 @@
 Log:
   Level: warning # Log level: none, error, warning, info, debug 
-  AccessPath: # /etc/next-server/access.Log
-  ErrorPath: # /etc/next-server/error.log
-DnsConfigPath: # /etc/next-server/dns.json
-RouteConfigPath: # /etc/next-server/route.json
-InboundConfigPath: # /etc/next-server/custom_inbound.json
-OutboundConfigPath: # /etc/next-server/custom_outbound.json
+  AccessPath: #/etc/next-server/access.Log
+  ErrorPath: #/etc/next-server/error.log
+DnsConfigPath: #/etc/next-server/dns.json
+RouteConfigPath: #/etc/next-server/route.json
+InboundConfigPath: #/etc/next-server/custom_inbound.json
+OutboundConfigPath: #/etc/next-server/custom_outbound.json
 ConnectionConfig:
   Handshake: 4 # Handshake time limit, Second
   ConnIdle: 30 # Connection idle time limit, Second
@@ -29,14 +29,12 @@ Nodes:
       UpdatePeriodic: 60 # Time to update the nodeinfo, how many sec.
       CertConfig:
         CertMode: dns # Option about how to get certificate: none, file, http, tls, dns. Choose "none" will forcedly disable the tls config.
-        CertDomain: "jc.680998.xyz" # Domain to cert
+        CertDomain: "999999999.680998.xyz" # Domain to cert
         CertFile: /etc/next-server/cert/node1.test.com.cert # Provided if the CertMode is file
         KeyFile: /etc/next-server/cert/node1.test.com.key
         Provider: cloudflare # cloudflare # DNS cert provider, Get the full support list here: https://go-acme.github.io/lego/dns/
         Email: L479647973@gmail.com
         DNSEnv: # DNS ENV option used by DNS provider
-          # ALICLOUD_ACCESS_KEY: aaa
-          # ALICLOUD_SECRET_KEY: bbb
           CF_DNS_API_TOKEN: -g7cJ7TyL5Vp7ErrxQpHG6jwLMKTlNjp1z7fP-5I
       EnableDNS: false # Use custom DNS config, Please ensure that you set the dns.json well
       DNSType: AsIs # AsIs, UseIP, UseIPv4, UseIPv6, DNS strategy
@@ -66,14 +64,12 @@ Nodes:
       UpdatePeriodic: 60 # Time to update the nodeinfo, how many sec.
       CertConfig:
         CertMode: dns # Option about how to get certificate: none, file, http, tls, dns. Choose "none" will forcedly disable the tls config.
-        CertDomain: "jc.680998.xyz" # Domain to cert
+        CertDomain: "999999999.680998.xyz" # Domain to cert
         CertFile: /etc/next-server/cert/node1.test.com.cert # Provided if the CertMode is file
         KeyFile: /etc/next-server/cert/node1.test.com.key
         Provider: cloudflare # cloudflare # DNS cert provider, Get the full support list here: https://go-acme.github.io/lego/dns/
         Email: L479647973@gmail.com
         DNSEnv: # DNS ENV option used by DNS provider
-          # ALICLOUD_ACCESS_KEY: aaa
-          # ALICLOUD_SECRET_KEY: bbb
           CF_DNS_API_TOKEN: -g7cJ7TyL5Vp7ErrxQpHG6jwLMKTlNjp1z7fP-5I
       EnableDNS: false # Use custom DNS config, Please ensure that you set the dns.json well
       DNSType: AsIs # AsIs, UseIP, UseIPv4, UseIPv6, DNS strategy
