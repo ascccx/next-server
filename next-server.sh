@@ -139,12 +139,12 @@ function uninstall() {
 
 function open_config() {
     echo -e "${YELLOW}正在打开节点对接配置文件...${NC}"
-    sudo vim /etc/next-server/config.yml
+    sudo nano /etc/next-server/config.yml
 }
 
 function open_dns() {
     echo -e "${YELLOW}正在打开DNS解锁配置文件...${NC}"
-    sudo vim /etc/next-server/dns.json
+    sudo nano /etc/next-server/dns.json
 }
 
 while true; do
