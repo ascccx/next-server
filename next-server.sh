@@ -12,19 +12,23 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 function show_menu() {
-    echo -e "${GREEN}NeXT-Server 一键脚本${NC}"
-    echo "一个基于Xray开发，支持多协议的专属后端框架"
-    echo "支持协议: (1) Shadowsocks2022 (2) Trojan (3) Vmess (4) TUIC"
-    echo "项目地址：https://github.com/The-NeXT-Project/NeXT-Server"
+    echo -e "${YELLOW}NeXT-Server 一键脚本${NC}"
+    echo -e "${YELLOW}一个基于Xray开发，支持多协议的专属后端框架${NC}"
+    echo -e "${YELLOW}支持协议: (1) Shadowsocks2022 (2) Trojan (3) Vmess${NC}"
+    echo -e "${YELLOW}项目地址：https://github.com/The-NeXT-Project/NeXT-Server${NC}"
     echo ""
     echo "请选择要执行的操作："
     echo -e "${GREEN}1${NC}. 安装 NeXT-Server"
     echo -e "${GREEN}2${NC}. 启动 NeXT-Server"
+    echo "----------------------------"  
     echo -e "${GREEN}3${NC}. 停止 NeXT-Server"
     echo -e "${GREEN}4${NC}. 重启 NeXT-Server"
     echo -e "${GREEN}5${NC}. 查看 NeXT-Server 日志"
     echo -e "${GREEN}6${NC}. 查看 NeXT-Server 状态"
     echo -e "${GREEN}7${NC}. 卸载 NeXT-Server"
+    echo "----------------------------"  
+    echo -e "${GREEN}8${NC}. 节点对接"
+    echo -e "${GREEN}9${NC}. DNS解锁"
     echo -e "${GREEN}0${NC}. 退出"
 }
 
@@ -35,10 +39,8 @@ function download_and_install() {
     echo -e "${YELLOW}正在创建安装目录...${NC}"
     mkdir -p "$INSTALL_DIR"
 
-    # 需要检查的文件列表
     FILES=("config.yml" "custom_inbound.json" "custom_outbound.json" "dns.json" "geoip.dat" "geosite.dat" "LICENSE" "next-server" "README.md" "route.json" "rulelist")
 
-    # 检查所有文件是否存在
     ALL_EXIST=true
     for file in "${FILES[@]}"; do
         if [ ! -f "$INSTALL_DIR/$file" ]; then
@@ -55,7 +57,6 @@ function download_and_install() {
         unzip -o /tmp/next-server.zip -d "$INSTALL_DIR"
     fi
 
-    # 如果服务文件存在，则只重启服务
     if [ -f "$SERVICE_FILE" ]; then
         echo -e "${YELLOW}系统服务文件已存在，仅重启 NeXT-Server。${NC}"
         sudo systemctl restart next-server
@@ -80,9 +81,7 @@ EOF
 
         echo -e "${YELLOW}正在重新加载 systemd 守护进程...${NC}"
         sudo systemctl daemon-reload
-        echo -e "${YELLOW}NeXT-Server 服务文件已创建并加载。${NC}"
         sudo systemctl enable next-server
-        sudo systemctl start next-server
     fi
 
     echo -e "${YELLOW}NeXT-Server 安装与配置完成。${NC}"
@@ -138,9 +137,19 @@ function uninstall() {
     fi
 }
 
+function open_config() {
+    echo -e "${YELLOW}正在打开节点对接配置文件...${NC}"
+    sudo vim /etc/next-server/config.yml
+}
+
+function open_dns() {
+    echo -e "${YELLOW}正在打开DNS解锁配置文件...${NC}"
+    sudo vim /etc/next-server/dns.json
+}
+
 while true; do
     show_menu
-    read -p "请输入你的选择 [0-7]: " choice
+    read -p "请输入你的选择 [0-9]: " choice
     case $choice in
         1)
             download_and_install
@@ -163,12 +172,18 @@ while true; do
         7)
             uninstall
             ;;
+        8)
+            open_config
+            ;;
+        9)
+            open_dns
+            ;;
         0)
             echo -e "${YELLOW}操作结束，已退出...${NC}"
             exit 0
             ;;
         *)
-            echo -e "${YELLOW}无效的选择，请输入 0 到 7 之间的数字。${NC}"
+            echo -e "${YELLOW}无效的选择，请输入 0 到 9 之间的数字。${NC}"
             ;;
     esac
 done
