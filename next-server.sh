@@ -4,12 +4,20 @@
 if ! grep -q "alias n=" ~/.bashrc; then
     echo "alias n='/root/next-server.sh'" >> ~/.bashrc
     source ~/.bashrc
-    echo "别名 'n' 已添加，重启终端后生效。"
+    echo "别名 'n' 已添加，当前会立即生效。"
 fi
 
-# 获取 NeXT-Server 的最新版本
-LATEST_VERSION=$(wget -qO- "https://api.github.com/repos/The-NeXT-Project/NeXT-Server/releases/latest" | grep "tag_name" | cut -d '"' -f 4)
-DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/download/${LATEST_VERSION}/next-server-linux-amd64.zip"
+# 检查系统架构
+ARCH=$(uname -m)
+if [[ "$ARCH" == "x86_64" ]]; then
+    DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/latest/download/next-server-linux-amd64.zip"
+elif [[ "$ARCH" == "aarch64" ]]; then
+    DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/latest/download/next-server-linux-arm64.zip"
+else
+    echo -e "\033[1;33m警告：当前系统架构为 $ARCH，不支持安装 NeXT-Server。\033[0m"
+    exit 1
+fi
+
 INSTALL_DIR="/etc/next-server"
 SERVICE_FILE="/etc/systemd/system/next-server.service"
 
@@ -22,24 +30,24 @@ function show_menu() {
     echo -e "NeXT-Server 一键脚本"
     echo ""
     echo "请选择要执行的操作："
-    echo -e "${GREEN}0${NC}. 退出"
-    echo "----------------------------" 
     echo -e "${GREEN}1${NC}. 安装 NeXT-Server"
     echo -e "${GREEN}2${NC}. 卸载 NeXT-Server"
-    echo "----------------------------" 
     echo -e "${GREEN}3${NC}. 启动 NeXT-Server"
     echo -e "${GREEN}4${NC}. 停止 NeXT-Server"
     echo -e "${GREEN}5${NC}. 重启 NeXT-Server"
     echo -e "${GREEN}6${NC}. 查看 NeXT-Server 日志"
     echo -e "${GREEN}7${NC}. 查看 NeXT-Server 状态"
-    echo "----------------------------"  
     echo -e "${GREEN}8${NC}. 节点对接"
     echo -e "${GREEN}9${NC}. DNS解锁"
 }
 
 function download_and_install() {
     echo -e "正在下载 NeXT-Server..."
-    wget -O /tmp/next-server.zip "$DOWNLOAD_URL"
+    wget -q -O /tmp/next-server.zip "$DOWNLOAD_URL"
+    if [[ $? -ne 0 ]]; then
+        echo -e "${YELLOW}下载失败，请检查网络连接或下载链接。${NC}"
+        exit 1
+    fi
 
     echo -e "正在创建安装目录..."
     mkdir -p "$INSTALL_DIR"
@@ -154,9 +162,8 @@ function open_dns() {
 }
 
 while true; do
-    clear # 每次运行时清屏
     show_menu
-    read -p "请输入你的选择 [0-9]: " choice
+    read -p "请输入你的选择 [1-9]: " choice
     case $choice in
         1)
             download_and_install
@@ -185,12 +192,12 @@ while true; do
         9)
             open_dns
             ;;
-        0)
-            echo -e "${YELLOW}操作结束，已退出...${NC}"
-            exit 0
-            ;;
         *)
-            echo -e "${YELLOW}无效的选择，请输入 0 到 9 之间的数字。${NC}"
+            echo -e "${YELLOW}无效的选择，请输入 1 到 9 之间的数字。${NC}"
             ;;
     esac
+
+    # 询问用户是否继续
+    read -n 1 -s -r -p "按任意键继续..."
+    echo ""
 done
