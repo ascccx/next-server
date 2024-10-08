@@ -1,30 +1,9 @@
 #!/bin/bash
 
-# 添加别名
-if ! grep -q "alias n=" ~/.bashrc; then
-    echo "alias n='/root/next-server.sh'" >> ~/.bashrc
-    source ~/.bashrc
-    echo "别名 'n' 已添加，当前会立即生效。"
-fi
-
-# 检查系统架构
-ARCH=$(uname -m)
-if [[ "$ARCH" == "x86_64" ]]; then
-    DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/latest/download/next-server-linux-amd64.zip"
-elif [[ "$ARCH" == "aarch64" ]]; then
-    DOWNLOAD_URL="https://github.com/The-NeXT-Project/NeXT-Server/releases/latest/download/next-server-linux-arm64.zip"
-else
-    echo -e "\033[1;33m警告：当前系统架构为 $ARCH，不支持安装 NeXT-Server。\033[0m"
-    exit 1
-fi
-
-INSTALL_DIR="/etc/next-server"
-SERVICE_FILE="/etc/systemd/system/next-server.service"
-
 # 颜色设置
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+YELLOW='\033[0;33m'
+NC='\033[0m' # 无颜色
 
 function show_menu() {
     echo -e "NeXT-Server 一键脚本"
@@ -40,167 +19,158 @@ function show_menu() {
     echo -e "${GREEN}6${NC}. 查看 NeXT-Server 日志"
     echo -e "${GREEN}7${NC}. 查看 NeXT-Server 状态"
     echo "----------------------------"
-    echo -e "${GREEN}8${NC}. 节点对接"
+    echo -e "${GREEN}8${NC}. 节点配置"
     echo -e "${GREEN}9${NC}. DNS解锁"
+    echo ""
 }
 
-function download_and_install() {
-    echo -e "正在下载 NeXT-Server..."
-    wget -q -O /tmp/next-server.zip "$DOWNLOAD_URL"
-    if [[ $? -ne 0 ]]; then
-        echo -e "${YELLOW}下载失败，请检查网络连接或下载链接。${NC}"
-        exit 1
-    fi
-
-    echo -e "正在创建安装目录..."
-    mkdir -p "$INSTALL_DIR"
-
-    FILES=("config.yml" "custom_inbound.json" "custom_outbound.json" "dns.json" "geoip.dat" "geosite.dat" "LICENSE" "next-server" "README.md" "route.json" "rulelist")
-
-    ALL_EXIST=true
-    for file in "${FILES[@]}"; do
-        if [ ! -f "$INSTALL_DIR/$file" ]; then
-            ALL_EXIST=false
-            break
-        fi
-    done
-
-    if [ "$ALL_EXIST" = true ]; then
-        echo -e "所有文件已存在，仅替换 next-server 文件..."
-        unzip -o /tmp/next-server.zip next-server -d "$INSTALL_DIR"
-    else
-        echo -e "部分文件不存在，解压所有文件..."
-        unzip -o /tmp/next-server.zip -d "$INSTALL_DIR"
-    fi
-
-    if [ -f "$SERVICE_FILE" ]; then
-        echo -e "系统服务文件已存在，仅重启 NeXT-Server。"
-        sudo systemctl restart next-server
-    else
-        echo -e "正在创建 systemd 服务文件..."
-        cat <<EOF | sudo tee "$SERVICE_FILE" > /dev/null
-[Unit]
-Description=NeXT Server
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/etc/next-server/next-server
-RestartSec=5s
-Restart=on-failure
-User=root
-Group=root
-WorkingDirectory=/etc/next-server
-
-[Install]
-WantedBy=multi-user.target
+function configure_nodes() {
+    echo -e "${YELLOW}请填写节点信息:${NC}"
+    
+    read -p "请输入 ApiHost: " api_host
+    read -p "请输入 ApiKey: " api_key
+    read -p "请输入 NodeID: " node_id
+    
+    # 创建或更新配置文件
+    CONFIG_FILE="/etc/next-server/config.yml"
+    cat <<EOF | sudo tee "$CONFIG_FILE" > /dev/null
+Log:
+  Level: warning # Log level: none, error, warning, info, debug 
+  AccessPath: # /etc/next-server/access.Log
+  ErrorPath: # /etc/next-server/error.log
+DnsConfigPath: /etc/next-server/dns.json
+RouteConfigPath: # /etc/next-server/route.json
+InboundConfigPath: # /etc/next-server/custom_inbound.json
+OutboundConfigPath: # /etc/next-server/custom_outbound.json
+ConnectionConfig:
+  Handshake: 4 # Handshake time limit, Second
+  ConnIdle: 30 # Connection idle time limit, Second
+  UplinkOnly: 2 # Time limit when the connection downstream is closed, Second
+  DownlinkOnly: 4 # Time limit when the connection is closed after the uplink is closed, Second
+  BufferSize: 64 # The internal cache size of each connection, kB
+Nodes:
+  - PanelType: "sspanel-old" # Panel type: sspanel-old, nextpanel-v1(wip)
+    ApiConfig:
+      ApiHost: "$api_host"
+      ApiKey: "$api_key"
+      NodeID: $node_id
+      NodeType: trojan # Node type: vmess, trojan, shadowsocks, shadowsocks2022
+      Timeout: 30 # Timeout for the api request
+      SpeedLimit: 0 # Mbps, Local settings will replace remote settings, 0 means disable
+      DeviceLimit: 0 # Local settings will replace remote settings, 0 means disable
+      RuleListPath: # /etc/next-server/rulelist Path to local rulelist file
+    ControllerConfig:
+      ListenIP: 0.0.0.0 # IP address you want to listen
+      SendIP: 0.0.0.0 # IP address you want to send package
+      UpdatePeriodic: 60 # Time to update the nodeinfo, how many sec.
+      CertConfig:
+        CertMode: dns # Option about how to get certificate: none, file, http, tls, dns. Choose "none" will forcedly disable the tls config.
+        CertDomain: "999999999.680998.xyz" # Domain to cert
+        CertFile: /etc/next-server/cert/node1.test.com.cert # Provided if the CertMode is file
+        KeyFile: /etc/next-server/cert/node1.test.com.key
+        Provider: cloudflare # cloudflare # DNS cert provider, Get the full support list here: https://go-acme.github.io/lego/dns/
+        Email: L479647973@gmail.com
+        DNSEnv: # DNS ENV option used by DNS provider
+          # ALICLOUD_ACCESS_KEY: aaa
+          # ALICLOUD_SECRET_KEY: bbb
+          CF_DNS_API_TOKEN: -g7cJ7TyL5Vp7ErrxQpHG6jwLMKTlNjp1z7fP-5I
+      EnableDNS: true # Use custom DNS config, Please ensure that you set the dns.json well
+      DNSType: UseIP # AsIs, UseIP, UseIPv4, UseIPv6, DNS strategy
+      DisableUploadTraffic: false # Disable upload traffic to API
+      DisableGetRule: false # Disable get rule
+      EnableProxyProtocol: false # Only works for WebSocket and TCP
+      DisableIVCheck: false # Disable IV check
+      DisableSniffing: false # Disable sniffing
+      AutoSpeedLimitConfig:
+        Limit: 0 # Warned speed. Set to 0 to disable AutoSpeedLimit (mbps)
+        WarnTimes: 0 # After (WarnTimes) consecutive warnings, the user will be limited. Set to 0 to punish overspeed user immediately.
+        LimitSpeed: 0 # The speedlimit of a limited user (unit: mbps)
+        LimitDuration: 0 # How many minutes will the limiting last (unit: minute)
+  - PanelType: "sspanel-old" # Panel type: sspanel-old, nextpanel-v1(wip)
+    ApiConfig:
+      ApiHost: "$api_host"
+      ApiKey: "$api_key"
+      NodeID: $((node_id + 1))
+      NodeType: trojan # Node type: vmess, trojan, shadowsocks, shadowsocks2022
+      Timeout: 30 # Timeout for the api request
+      SpeedLimit: 0 # Mbps, Local settings will replace remote settings, 0 means disable
+      DeviceLimit: 0 # Local settings will replace remote settings, 0 means disable
+      RuleListPath: # /etc/next-server/rulelist Path to local rulelist file
+    ControllerConfig:
+      ListenIP: 0.0.0.0 # IP address you want to listen
+      SendIP: 0.0.0.0 # IP address you want to send package
+      UpdatePeriodic: 60 # Time to update the nodeinfo, how many sec.
+      CertConfig:
+        CertMode: dns # Option about how to get certificate: none, file, http, tls, dns. Choose "none" will forcedly disable the tls config.
+        CertDomain: "999999999.680998.xyz" # Domain to cert
+        CertFile: /etc/next-server/cert/node1.test.com.cert # Provided if the CertMode is file
+        KeyFile: /etc/next-server/cert/node1.test.com.key
+        Provider: cloudflare # cloudflare # DNS cert provider, Get the full support list here: https://go-acme.github.io/lego/dns/
+        Email: L479647973@gmail.com
+        DNSEnv: # DNS ENV option used by DNS provider
+          # ALICLOUD_ACCESS_KEY: aaa
+          # ALICLOUD_SECRET_KEY: bbb
+          CF_DNS_API_TOKEN: -g7cJ7TyL5Vp7ErrxQpHG6jwLMKTlNjp1z7fP-5I
+      EnableDNS: true # Use custom DNS config, Please ensure that you set the dns.json well
+      DNSType: UseIP # AsIs, UseIP, UseIPv4, UseIPv6, DNS strategy
+      DisableUploadTraffic: false # Disable upload traffic to API
+      DisableGetRule: false # Disable get rule
+      EnableProxyProtocol: false # Only works for WebSocket and TCP
+      DisableIVCheck: false # Disable IV check
+      DisableSniffing: false # Disable sniffing
+      AutoSpeedLimitConfig:
+        Limit: 0 # Warned speed. Set to 0 to disable AutoSpeedLimit (mbps)
+        WarnTimes: 0 # After (WarnTimes) consecutive warnings, the user will be limited. Set to 0 to punish overspeed user immediately.
+        LimitSpeed: 0 # The speedlimit of a limited user (unit: mbps)
+        LimitDuration: 0 # How many minutes will the limiting last (unit: minute)
 EOF
 
-        echo -e "正在重新加载 systemd 守护进程..."
-        sudo systemctl daemon-reload
-        sudo systemctl enable next-server
-    fi
-
-    echo -e "NeXT-Server 安装与配置完成。"
+    echo -e "${YELLOW}节点配置已更新至 $CONFIG_FILE${NC}"
 }
 
-function start_service() {
-    echo -e "正在启动 NeXT-Server..."
-    sudo systemctl start next-server
-    echo -e "${YELLOW}NeXT-Server 已启动。${NC}"
-}
-
-function stop_service() {
-    echo -e "正在停止 NeXT-Server..."
-    sudo systemctl stop next-server
-    echo -e "${YELLOW}NeXT-Server 已停止。${NC}"
-}
-
-function restart_service() {
-    echo -e "正在重启 NeXT-Server..."
-    sudo systemctl restart next-server
-    echo -e "${YELLOW}NeXT-Server 已重启。${NC}"
-}
-
-function view_logs() {
-    echo -e "${YELLOW}正在查看 NeXT-Server 日志...${NC}"
-    sudo journalctl -u next-server -f
-}
-
-function check_status() {
-    echo -e "${YELLOW}正在检查 NeXT-Server 状态...${NC}"
-    sudo systemctl status next-server
-}
-
-function uninstall() {
-    read -p "确定要卸载 NeXT-Server 吗？[y/N]: " confirm
-    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "正在停止并禁用 NeXT-Server..."
-        sudo systemctl stop next-server
-        sudo systemctl disable next-server
-
-        echo -e "正在删除 systemd 服务文件..."
-        sudo rm -f "$SERVICE_FILE"
-
-        echo -e "正在删除安装目录..."
-        sudo rm -rf "$INSTALL_DIR"
-
-        echo -e "正在重新加载 systemd 守护进程..."
-        sudo systemctl daemon-reload
-
-        echo -e "${YELLOW}NeXT-Server 已卸载。${NC}"
-    else
-        echo -e "${YELLOW}卸载已取消。${NC}"
-    fi
-}
-
-function open_config() {
-    echo -e "${YELLOW}正在打开节点对接配置文件...${NC}"
-    sudo nano /etc/next-server/config.yml
-}
-
-function open_dns() {
-    echo -e "${YELLOW}正在打开DNS解锁配置文件...${NC}"
-    sudo nano /etc/next-server/dns.json
-}
-
+# 主程序循环
 while true; do
     show_menu
-    read -p "请输入你的选择 [1-9]: " choice
+    read -p "请输入选项: " choice
     case $choice in
         1)
-            download_and_install
+            echo "安装 NeXT-Server 的操作..."
+            # 这里添加安装的具体操作
             ;;
         2)
-            uninstall
+            echo "卸载 NeXT-Server 的操作..."
+            # 这里添加卸载的具体操作
             ;;
         3)
-            start_service
+            echo "启动 NeXT-Server 的操作..."
+            # 这里添加启动的具体操作
             ;;
         4)
-            stop_service
+            echo "停止 NeXT-Server 的操作..."
+            # 这里添加停止的具体操作
             ;;
         5)
-            restart_service
+            echo "重启 NeXT-Server 的操作..."
+            # 这里添加重启的具体操作
             ;;
         6)
-            view_logs
+            echo "查看 NeXT-Server 日志的操作..."
+            # 这里添加查看日志的具体操作
             ;;
         7)
-            check_status
+            echo "查看 NeXT-Server 状态的操作..."
+            # 这里添加查看状态的具体操作
             ;;
         8)
-            open_config
+            configure_nodes  # 调用配置函数
             ;;
         9)
-            open_dns
+            echo "DNS解锁的操作..."
+            # 这里添加 DNS 解锁的具体操作
             ;;
         *)
-            echo -e "${YELLOW}无效的选择，请输入 1 到 9 之间的数字。${NC}"
+            echo "无效的选项，请重新选择。"
             ;;
     esac
-
-    # 询问用户是否继续
-    read -n 1 -s -r -p "按任意键继续..."
     echo ""
 done
